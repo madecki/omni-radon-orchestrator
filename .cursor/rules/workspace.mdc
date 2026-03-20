@@ -1,0 +1,90 @@
+---
+description: Workspace-level rules for cross-repository work in the OmniRadon multi-repo stack
+globs: ["**/*"]
+alwaysApply: true
+---
+
+# OmniRadon — Workspace Rules
+
+This workspace orchestrates four separate repositories. Apply these rules whenever working across multiple repositories or from this workspace root.
+
+## Repository map
+
+| Directory      | Purpose                                          | Port(s)        |
+|----------------|--------------------------------------------------|----------------|
+| `shell`        | MFE entry point — login, register, auth routing  | 3001           |
+| `gateway`      | API gateway / reverse proxy (single origin)      | 3000           |
+| `auth-service` | Authentication microservice — JWT RS256, JWKS    | 4001           |
+| `diary`        | Diary MFE + API + worker (Turborepo monorepo)    | 4280 / 4281    |
+
+This workspace repo (`OmniRadon`) contains **only orchestration**: scripts, Makefile, README, and these rules. It contains no application logic.
+
+---
+
+## Rules
+
+### 1. Understand repository boundaries before making changes
+
+Before writing any code, identify which repository owns the affected domain. A feature touching authentication, diary content, and the shell UI involves three separate repos — treat them as independent.
+
+### 2. Keep business logic inside the appropriate repository
+
+- Auth logic (JWT issuance, refresh tokens, JWKS) → `auth-service`
+- Diary domain logic (entries, outbox events) → `diary`
+- Routing and proxy rules → `gateway`
+- Auth UI flows (login form, register, token handoff) → `shell`
+- Orchestration scripts only → this workspace repo
+
+### 3. Do not add application code to this workspace repository
+
+This repo is not a shared library. Do not create `packages/`, `src/`, or any application code here. If you find yourself adding business logic to the workspace repo, stop and put it in the correct service instead.
+
+### 4. Inspect all impacted repositories before implementing a cross-repo feature
+
+A cross-cutting change (e.g. a new auth claim, a new MFE route, a new event contract) typically requires coordinated changes in multiple repos. Read and understand all affected codebases before writing code in any of them.
+
+### 5. Prefer incremental, targeted changes
+
+Make the smallest change needed in each repository. Avoid large refactors that span multiple repos in a single session. Commit and review changes per-repository independently.
+
+### 6. Preserve the service boundaries
+
+- The gateway is the **single entry point** — application code must not bypass it by calling services directly.
+- Each service owns its own database — do not share databases between `auth-service` and `diary`.
+- `diary-api` is protected by `GATEWAY_SERVICE_TOKEN`, not by user JWTs directly.
+- `shell` handles auth UI; `diary-web` handles diary content only.
+
+### 7. Do not introduce monorepo assumptions
+
+These repos are **not** a monorepo. Do not:
+
+- Create shared packages, shared `node_modules`, or a root `package.json` in this workspace repo
+- Assume a unified build pipeline or single lock file
+- Use Turborepo, Nx, or similar tools at the workspace level
+- Treat this workspace as the source of truth for any application code or contracts
+
+### 8. Commit and push each repository independently
+
+Each repository has its own git history, CI pipeline, and reviewer audience. Changes in different repos must be committed and pushed separately. Cross-repo PRs do not exist — coordinate via documentation or issue links.
+
+### 9. Do not duplicate per-repository Cursor rules here
+
+Repository-specific coding standards belong in each repo's own `.cursor/rules/`. This file covers only cross-cutting, workspace-level concerns.
+
+---
+
+## Architecture overview
+
+```
+Browser
+  └── Gateway :3000                          (single origin, JWT validation via JWKS)
+        ├── /                → Shell :3001   (login / register / auth redirect)
+        ├── /auth/*          → Auth Service :4001   (RS256 JWT, JWKS, refresh rotation)
+        ├── /app/diary       → Diary Web :4280      (Next.js MFE, BlockNote editor)
+        └── /diary/*         → Diary API :4281      (NestJS, Prisma, service token auth)
+
+Background:
+  Diary Worker  → NATS JetStream :42220  (outbox publisher for DIARY_EVENTS)
+```
+
+Auth flow summary: `Shell` collects credentials → `Auth Service` issues RS256 JWT → JWT passed via hash fragment to `Diary Web` → `Gateway` validates JWT via JWKS on every subsequent request.

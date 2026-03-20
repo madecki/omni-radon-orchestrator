@@ -1,0 +1,17 @@
+# ── Cloned repositories ───────────────────────────────────────────────────────
+# These are separate git repositories, not part of this workspace repo.
+shell/
+gateway/
+auth-service/
+diary/
+
+# ── Runtime artifacts ─────────────────────────────────────────────────────────
+logs/
+.pids/
+
+# ── Local environment ─────────────────────────────────────────────────────────
+.env
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+*.swp
