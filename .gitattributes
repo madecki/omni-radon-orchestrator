@@ -1,0 +1,13 @@
+# Normalize all text files to LF on commit (Unix/Mac style).
+# On checkout, files stay as LF on all platforms.
+* text=auto eol=lf
+
+# Explicitly mark binary files so Git never tries to convert them.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.gz binary

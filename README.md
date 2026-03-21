@@ -29,13 +29,16 @@ OmniRadon/                   ← this workspace repo
 │   └── rules/
 │       └── workspace.mdc    ← cross-repo Cursor rules
 ├── scripts/
-│   ├── clone.sh             ← clone all repos
-│   ├── pull.sh              ← pull updates in all repos
-│   ├── bootstrap.sh         ← full first-time setup
-│   ├── dev.sh               ← start full dev stack
-│   └── stop.sh              ← stop all running services
+│   ├── lib.mjs              ← shared helpers (paths, repos.conf, PATH checks)
+│   ├── clone.mjs            ← clone all repos
+│   ├── pull.mjs             ← pull updates in all repos
+│   ├── bootstrap.mjs        ← full first-time setup
+│   ├── dev.mjs              ← start full dev stack
+│   ├── stop.mjs             ← stop all running services
+│   └── logs.mjs             ← tail service logs (prefixed or single)
+├── run.mjs                  ← cross-platform CLI (Windows, macOS, Linux)
 ├── repos.conf               ← centralized repo URL list
-├── Makefile                 ← convenience shortcuts
+├── Makefile                 ← optional shortcuts (calls `node run.mjs …`)
 ├── .env.example             ← workspace env reference
 ├── .gitignore
 ├── README.md
@@ -45,6 +48,24 @@ OmniRadon/                   ← this workspace repo
 ├── auth-service/            ← cloned repo (git-ignored here)
 └── diary/                   ← cloned repo (git-ignored here)
 ```
+
+### Cross-platform commands
+
+Orchestration is implemented in **Node.js** (no Bash required). Use from the workspace root:
+
+| Command | Purpose |
+|--------|---------|
+| `node run.mjs help` | List commands |
+| `node run.mjs clone` | Clone all repos |
+| `node run.mjs pull` | Pull all repos |
+| `node run.mjs bootstrap` | Clone + `pnpm install` + env hints |
+| `node run.mjs dev` | Start the full stack |
+| `node run.mjs stop` | Stop tracked services + port cleanup |
+| `node run.mjs logs` | Tail all logs (prefixed) |
+| `node run.mjs logs gateway` | Tail one service |
+| `node run.mjs logs gateway shell` | Tail several (prefixed) |
+
+On macOS/Linux, if `make` is installed, `make dev` and the other Makefile targets work the same way (they call `node run.mjs …`).
 
 ---
 
@@ -75,8 +96,10 @@ diary         git@github.com:your-org/diary.git
 ### 2. Bootstrap the workspace
 
 ```bash
-make bootstrap
+node run.mjs bootstrap
 ```
+
+(or `make bootstrap` if you use Make)
 
 This will:
 1. Clone all repositories (skips any already present)
@@ -100,21 +123,23 @@ Shell and diary do not require manual `.env` setup for local development.
 ### 4. Start the stack
 
 ```bash
-make dev
+node run.mjs dev
 ```
 
 ---
 
 ## Day-to-day commands
 
-| Command          | What it does                                      |
-|------------------|---------------------------------------------------|
-| `make clone`     | Clone all repos (safe to re-run, skips existing)  |
-| `make pull`      | `git pull --ff-only` in every repo                |
-| `make bootstrap` | Full first-time setup (clone + install + checks)  |
-| `make dev`       | Start the full development stack                  |
-| `make stop`      | Stop all running services                         |
-| `make logs`      | Tail logs: all services (prefixed) or one if `S=<name>` |
+| Command | What it does |
+|---------|----------------|
+| `node run.mjs clone` | Clone all repos (safe to re-run, skips existing) |
+| `node run.mjs pull` | `git pull --ff-only` in every repo |
+| `node run.mjs bootstrap` | Full first-time setup (clone + install + checks) |
+| `node run.mjs dev` | Start the full development stack |
+| `node run.mjs stop` | Stop all running services |
+| `node run.mjs logs` | Tail logs: all services (prefixed) |
+| `node run.mjs logs <name>` | Tail one service |
+| `make …` | Same as `node run.mjs …` if Make is available (e.g. `make logs S=gateway`) |
 
 ---
 
@@ -137,36 +162,35 @@ Always access the application through the **gateway on port 3000**. Do not use t
 
 ## Logs
 
-When running `make dev`, each service writes its output to `./logs/<service>.log` (auth-service, diary, gateway, shell).
+When running `node run.mjs dev`, each service writes its output to `./logs/<service>.log` (auth-service, diary, gateway, shell).
 
 **All services in one terminal** (each line prefixed with `[service]`):
 ```bash
-make logs
+node run.mjs logs
 ```
 
 **Single service** (in a separate terminal):
 ```bash
-make logs S=gateway
-# or directly:
-tail -f logs/gateway.log
-tail -f logs/auth-service.log
-tail -f logs/diary.log
-tail -f logs/shell.log
+node run.mjs logs gateway
 ```
 
 **A subset of services** in one terminal (prefixed):
 ```bash
-./scripts/logs.sh gateway shell
+node run.mjs logs gateway shell
 ```
+
+With Make (optional): `make logs` or `make logs S=gateway`.
+
+You can still open log files in any editor, or use your platform’s `tail` if you prefer.
 
 ---
 
 ## Stopping the stack
 
-Press `Ctrl+C` in the terminal running `make dev`, or in a separate terminal:
+Press `Ctrl+C` in the terminal running `node run.mjs dev`, or in a separate terminal:
 
 ```bash
-make stop
+node run.mjs stop
 ```
 
 This sends `SIGTERM` to all tracked processes. If any service uses Docker Compose internally (auth-service, diary), you may also need to stop those containers:
@@ -199,7 +223,7 @@ Auth flow: `Shell` collects credentials → `Auth Service` issues RS256 JWT → 
 
 ## How startup works
 
-`make dev` starts services in this order:
+`node run.mjs dev` starts services in this order:
 
 1. **auth-service** — `pnpm dev` (starts Postgres via Docker Compose, runs Prisma migrate, starts NestJS in watch mode)
 2. **diary** — `pnpm start` (starts Postgres + NATS via Docker Compose, runs Prisma migrate, starts all Turbo apps)
@@ -214,7 +238,7 @@ Each service handles its own infrastructure. The workspace script does not manag
 ## Pulling updates
 
 ```bash
-make pull
+node run.mjs pull
 ```
 
 This runs `git pull --ff-only` in every cloned repo. It will skip repositories that are not yet cloned and report failures clearly if a pull would diverge. It does not force-push, reset, or stash anything.
@@ -231,7 +255,7 @@ The following cannot be fully automated and require manual steps:
 | SSH keys / GitHub access          | Your local git configuration           |
 | RSA key pair for JWT signing      | `auth-service/.env` (see its README)   |
 | `GATEWAY_SERVICE_TOKEN` value     | Both `gateway/.env` and `diary/.env`   |
-| Docker Desktop                    | Must be running before `make dev`      |
+| Docker Desktop                    | Must be running before `node run.mjs dev` |
 
 Refer to the README in each individual repository for the full setup details.
 
