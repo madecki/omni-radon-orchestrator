@@ -1,0 +1,363 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": { "list": [] },
+  "description": "OmniRadon dev stack — health indicators and per-service logs",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": ["omni-radon"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "OmniRadon Dev Stack",
+  "uid": "omni-radon-dev",
+  "version": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Gateway",
+      "description": "Log lines received in the last 2 minutes. Zero means the service is silent or down.",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({service=\"gateway\"}[2m])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "color": "red", "index": 0, "text": "No data" }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": { "color": "orange", "index": 1, "text": "Idle" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Auth Service",
+      "description": "Log lines received in the last 2 minutes. Zero means the service is silent or down.",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({service=\"auth-service\"}[2m])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "color": "red", "index": 0, "text": "No data" }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": { "color": "orange", "index": 1, "text": "Idle" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Diary",
+      "description": "Log lines received in the last 2 minutes. Zero means the service is silent or down.",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({service=\"diary\"}[2m])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "color": "red", "index": 0, "text": "No data" }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": { "color": "orange", "index": 1, "text": "Idle" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Shell",
+      "description": "Log lines received in the last 2 minutes. Zero means the service is silent or down.",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 4 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "count_over_time({service=\"shell\"}[2m])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "color": "red", "index": 0, "text": "No data" }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": { "color": "orange", "index": 1, "text": "Idle" }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Gateway  ·  :3000",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"gateway\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 6,
+      "type": "logs",
+      "title": "Auth Service  ·  :4001",
+      "gridPos": { "x": 0, "y": 14, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"auth-service\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 7,
+      "type": "logs",
+      "title": "Diary  ·  web :4280  ·  api :4281",
+      "gridPos": { "x": 0, "y": 24, "w": 24, "h": 10 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"diary\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    },
+    {
+      "id": 8,
+      "type": "logs",
+      "title": "Shell  ·  :3001",
+      "gridPos": { "x": 0, "y": 34, "w": 24, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "{service=\"shell\"}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      }
+    }
+  ]
+}

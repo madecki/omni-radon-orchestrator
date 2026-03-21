@@ -5,8 +5,12 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { getWorkspaceRoot } from './lib.mjs';
 import { runStop } from './stop.mjs';
+
+const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
+const SERVICE_RUNNER = path.join(SCRIPTS_DIR, 'service-runner.mjs');
 
 const INFRA_WAIT_MS = 15_000;
 
@@ -25,19 +29,49 @@ function startService(workspaceRoot, name, relDir, command) {
   fs.mkdirSync(logsDir, { recursive: true });
   fs.mkdirSync(pidsDir, { recursive: true });
 
-  const logStream = fs.createWriteStream(logPath, { flags: 'a' });
+  // Open the log file synchronously so we have a real Windows HANDLE before
+  // calling spawn. We pass this fd directly as stdio[1] and stdio[2] to the
+  // service-runner child process (a Node.js script). Node.js correctly inherits
+  // and forwards fd-based handles; cmd.exe does not — it silently drops them
+  // when creating its own child processes, which is why every shell-redirect
+  // approach produced empty log files.
+  //
+  // On Windows a previous process may still be releasing its handle after being
+  // killed (ERROR_BUSY / EBUSY). Retry a few times before giving up.
+  let logFd;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      logFd = fs.openSync(logPath, 'a');
+      break;
+    } catch (err) {
+      if (err.code !== 'EBUSY' || attempt === 5) {
+        // Non-fatal: skip this service rather than crashing the whole stack.
+        console.error(`  ERROR ${name}  (cannot open log file after ${attempt} attempts: ${err.message})`);
+        console.error(`         Kill any process holding ${logPath} and run make stop && make dev again.`);
+        return;
+      }
+      console.log(`  WAIT  ${name}  (log file busy, retry ${attempt}/5…)`);
+      const until = Date.now() + 1000;
+      while (Date.now() < until) { /* spin — intentionally sync */ }
+    }
+  }
 
-  const child = spawn(command, {
+  const child = spawn(process.execPath, [SERVICE_RUNNER, ...command.split(' ')], {
     cwd: dir,
-    shell: true,
     detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: ['ignore', logFd, logFd],
     env: { ...process.env },
     windowsHide: true,
   });
 
-  child.stdout.pipe(logStream);
-  child.stderr.pipe(logStream);
+  // Close our copy of the fd — the child holds its own inherited handle.
+  fs.closeSync(logFd);
+
+  // Do NOT call child.unref() — the child references are what keep the parent
+  // event loop alive. An unresolved Promise does not count as an event loop
+  // reference in Node.js, so unref() on all children causes immediate exit.
+  // Children are detached (own process group) so they survive the parent if
+  // the parent is killed; the SIGINT handler explicitly stops them via runStop().
 
   child.on('error', (err) => {
     console.error(`  ERROR ${name}:`, err.message);

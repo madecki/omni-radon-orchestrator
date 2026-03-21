@@ -1,0 +1,29 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: omni-radon
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: omni-radon
+          __path__: /logs/*.log
+    pipeline_stages:
+      - regex:
+          # Extract service name from the log filename, e.g. /logs/gateway.log → service=gateway
+          expression: '/logs/(?P<service>[^.]+)\.log'
+          source: filename
+      - labels:
+          service:
+      - replace:
+          # Strip ANSI colour codes emitted by pino-pretty in dev mode
+          expression: '\x1b\[[0-9;]*[mGKHF]'
+          replace: ''

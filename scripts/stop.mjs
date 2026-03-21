@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Stop tracked services (PID files) and fall back to killing listeners on stack ports.
+ * Stop tracked services (PID files), run per-repo `pnpm run dev:stop` (Docker Compose down),
+ * then kill any remaining listeners on stack ports.
  */
 import { execSync, spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { getWorkspaceRoot, isWin32 } from './lib.mjs';
+import { getWorkspaceRoot, isWin32, repoPath } from './lib.mjs';
 
 /** Same ports as previous stop.sh */
 const STACK_PORTS = [3000, 3001, 4001, 4280, 4281, 5433, 54320, 42220];
@@ -104,11 +105,72 @@ function pidsListeningOnPort(port) {
   return isWin32() ? pidsListeningOnPortWin(port) : pidsListeningOnPortUnix(port);
 }
 
+/**
+ * Kill any lingering "node run.mjs logs" processes.
+ * On Windows, fs.watch() holds a ReadDirectoryChangesW handle on the logs/
+ * directory which causes EBUSY when dev.mjs tries to open log files for write.
+ */
+/**
+ * Run `pnpm run dev:stop` when package.json defines it (e.g. auth-service, diary — docker compose down).
+ */
+function runRepoDevStop(repoName) {
+  const dir = repoPath(repoName);
+  if (!fs.existsSync(dir)) {
+    console.log(`  SKIP  ${repoName} dev:stop (directory not found)`);
+    return;
+  }
+  const pkgPath = path.join(dir, 'package.json');
+  if (!fs.existsSync(pkgPath)) return;
+  let pkg;
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+  } catch {
+    console.log(`  WARN  ${repoName} dev:stop (could not read package.json)`);
+    return;
+  }
+  const script = pkg.scripts?.['dev:stop'];
+  if (typeof script !== 'string' || !script.trim()) return;
+
+  console.log(`  STOP  ${repoName}  (pnpm run dev:stop)`);
+  const r = spawnSync('pnpm', ['run', 'dev:stop'], {
+    cwd: dir,
+    stdio: 'inherit',
+    shell: true,
+    windowsHide: true,
+  });
+  if (r.status !== 0 && r.status != null) {
+    console.log(`  WARN  ${repoName} dev:stop exited with code ${r.status} — continuing`);
+  }
+}
+
+function killLogsWatchers() {
+  if (!isWin32()) return;
+  try {
+    const out = execSync('wmic process where "name=\'node.exe\'" get processid,commandline /format:csv', {
+      encoding: 'utf8',
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    for (const line of out.split(/\r?\n/)) {
+      if (!line.includes('run.mjs') || !line.includes('logs')) continue;
+      const m = line.match(/,(\d+)\s*$/);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      if (pid && pid !== process.pid) {
+        spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+      }
+    }
+  } catch {
+    /* wmic not available or no matches — ignore */
+  }
+}
+
 export function runStop() {
   const workspaceRoot = getWorkspaceRoot();
   const pidsDir = path.join(workspaceRoot, '.pids');
 
   console.log('==> Stopping services...');
+  killLogsWatchers();
 
   if (fs.existsSync(pidsDir)) {
     const files = fs.readdirSync(pidsDir).filter((f) => f.endsWith('.pid'));
@@ -132,6 +194,9 @@ export function runStop() {
       }
     }
   }
+
+  runRepoDevStop('auth-service');
+  runRepoDevStop('diary');
 
   for (const port of STACK_PORTS) {
     const pids = pidsListeningOnPort(port);
