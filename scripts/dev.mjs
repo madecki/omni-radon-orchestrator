@@ -111,6 +111,9 @@ export async function runDev() {
 
   startService(workspaceRoot, 'auth-service', 'auth-service', 'pnpm dev');
   startService(workspaceRoot, 'diary', 'diary', 'pnpm start');
+  startService(workspaceRoot, 'llm-service', 'llm-service', 'pnpm start');
+  startService(workspaceRoot, 'settings', 'settings', 'pnpm start');
+  startService(workspaceRoot, 'task-manager', 'task-manager', 'pnpm start');
 
   console.log('');
   console.log('  Waiting 15s for databases and infra to become ready...');
@@ -128,6 +131,12 @@ export async function runDev() {
   console.log('║   Auth Service →  http://localhost:4001              ║');
   console.log('║   Diary Web    →  http://localhost:4280              ║');
   console.log('║   Diary API    →  http://localhost:4281              ║');
+  console.log('║   Settings Web →  http://localhost:4380              ║');
+  console.log('║   Settings API →  http://localhost:4381              ║');
+  console.log('║   Task Mgr Web  →  http://localhost:4480              ║');
+  console.log('║   Task Mgr API  →  http://localhost:4481              ║');
+  console.log('║   LLM Service   →  http://localhost:4583              ║');
+  console.log('║   LLM Postgres  →  localhost:54323                    ║');
   console.log('║                                                      ║');
   console.log('║   Logs:    ./logs/<service>.log                      ║');
   console.log('║   Tail:    node run.mjs logs                         ║');

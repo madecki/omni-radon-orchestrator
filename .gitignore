@@ -4,6 +4,8 @@ shell/
 gateway/
 auth-service/
 diary/
+settings/
+task-manager/
 
 # ── Runtime artifacts ─────────────────────────────────────────────────────────
 logs/

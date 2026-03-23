@@ -46,7 +46,10 @@ OmniRadon/                   ← this workspace repo
 ├── shell/                   ← cloned repo (git-ignored here)
 ├── gateway/                 ← cloned repo (git-ignored here)
 ├── auth-service/            ← cloned repo (git-ignored here)
-└── diary/                   ← cloned repo (git-ignored here)
+├── diary/                   ← cloned repo (git-ignored here)
+├── llm-service/             ← cloned repo (git-ignored here)
+├── settings/                ← cloned repo (git-ignored here)
+└── task-manager/            ← cloned repo (git-ignored here)
 ```
 
 ### Cross-platform commands
@@ -91,6 +94,9 @@ shell         git@github.com:your-org/shell.git
 gateway       git@github.com:your-org/gateway.git
 auth-service  git@github.com:your-org/auth-service.git
 diary         git@github.com:your-org/diary.git
+llm-service   git@github.com:your-org/llm-service.git
+settings      git@github.com:your-org/settings.git
+task-manager  git@github.com:your-org/task-manager.git
 ```
 
 ### 2. Bootstrap the workspace
@@ -118,7 +124,11 @@ cp auth-service/.env.example auth-service/.env
 # fill in auth-service/.env
 ```
 
-Shell and diary do not require manual `.env` setup for local development.
+Configure `task-manager/apps/task-manager-api/.env` (copy from `.env.example`); set `GATEWAY_SERVICE_TOKEN` to the same value as `TASKS_SERVICE_TOKEN` in `gateway/.env`.
+
+Copy `llm-service/.env.example` → `llm-service/.env` (`DATABASE_URL`, `NATS_URL`, `OLLAMA_BASE_URL`). **Ollama** must be running on the host (default `http://localhost:11434`) with your chosen model pulled.
+
+Shell, diary-web, and settings-web do not require their own `.env` files for local development beyond gateway/service tokens.
 
 ### 4. Start the stack
 
@@ -154,15 +164,24 @@ node run.mjs dev
 | Diary API      | http://localhost:4281        | REST API for diary entries        |
 | Auth Postgres  | localhost:5433               | Auth service database             |
 | Diary Postgres | localhost:54320              | Diary database                    |
-| NATS           | localhost:42220              | JetStream (diary worker)          |
+| NATS (diary)   | localhost:42220              | JetStream (diary worker)          |
+| LLM Service    | http://localhost:4583        | Ollama gateway API (NestJS)       |
+| LLM Postgres   | localhost:54323              | LLM service database            |
+| Settings Web   | http://localhost:4380        | Settings MFE (Next.js)            |
+| Settings API   | http://localhost:4381        | Settings REST API                 |
+| Settings Postgres | localhost:54321           | Settings database                 |
+| Task Manager Web | http://localhost:4480      | Task Manager MFE (Next.js)        |
+| Task Manager API | http://localhost:4481      | Task Manager REST API             |
+| Task Manager Postgres | localhost:54322     | Task Manager database             |
+| NATS (tasks)   | localhost:42221              | JetStream (reserved / future)     |
 
-Always access the application through the **gateway on port 3000**. Do not use the service ports directly in a browser.
+Always access the application through the **gateway on port 3000**. Do not use the service ports directly in a browser. (The LLM API is internal-first on **4583**; gateway routing is optional.)
 
 ---
 
 ## Logs
 
-When running `node run.mjs dev`, each service writes its output to `./logs/<service>.log` (auth-service, diary, gateway, shell).
+When running `node run.mjs dev`, each service writes its output to `./logs/<service>.log` (auth-service, diary, llm-service, settings, task-manager, gateway, shell).
 
 **All services in one terminal** (each line prefixed with `[service]`):
 ```bash
@@ -193,12 +212,13 @@ Press `Ctrl+C` in the terminal running `node run.mjs dev`, or in a separate term
 node run.mjs stop
 ```
 
-This sends `SIGTERM` to all tracked processes. If any service uses Docker Compose internally (auth-service, diary), you may also need to stop those containers:
+This sends `SIGTERM` to all tracked processes, runs `pnpm run dev:stop` where defined (Docker Compose down), then clears listeners on known stack ports. If containers remain:
 
 ```bash
 docker ps                              # check running containers
 cd auth-service && docker compose down
 cd diary && docker compose -f infra/docker-compose.yml down
+cd llm-service && docker compose -f infra/docker-compose.yml down
 ```
 
 ---
@@ -208,13 +228,19 @@ cd diary && docker compose -f infra/docker-compose.yml down
 ```
 Browser
   └── Gateway :3000
-        ├── /                → Shell :3001      (auth UI, MFE entry)
+        ├── /                → Shell :3001           (auth UI, MFE entry)
         ├── /auth/*          → Auth Service :4001
-        ├── /app/diary       → Diary Web :4280
-        └── /diary/*         → Diary API :4281
+        ├── /mfe/diary/*     → Diary Web :4280
+        ├── /mfe/settings/*  → Settings Web :4380
+        ├── /mfe/tasks/*     → Task Manager Web :4480
+        ├── /diary/*         → Diary API :4281
+        ├── /settings/*      → Settings API :4381
+        └── /tasks/*         → Task Manager API :4481
 
 Background:
   Diary Worker → NATS JetStream :42220
+  LLM Service  → consumes DIARY_EVENTS → Ollama on host :11434
+  (future) Task events → NATS JetStream :42221
 ```
 
 Auth flow: `Shell` collects credentials → `Auth Service` issues RS256 JWT → token passed via hash fragment to `Diary Web` → `Gateway` validates JWT via JWKS on every request.
@@ -227,9 +253,12 @@ Auth flow: `Shell` collects credentials → `Auth Service` issues RS256 JWT → 
 
 1. **auth-service** — `pnpm dev` (starts Postgres via Docker Compose, runs Prisma migrate, starts NestJS in watch mode)
 2. **diary** — `pnpm start` (starts Postgres + NATS via Docker Compose, runs Prisma migrate, starts all Turbo apps)
-3. *(15-second wait for databases to become ready)*
-4. **shell** — `pnpm dev` (Next.js dev server)
-5. **gateway** — `pnpm dev` (NestJS in watch mode)
+3. **llm-service** — `pnpm start` (Postgres via Docker Compose, Prisma migrate deploy, NestJS dev — consumes **NATS :42220** after diary is up)
+4. **settings** — `pnpm start` (Postgres via Docker Compose, migrate, Turbo dev)
+5. **task-manager** — `pnpm start` (Postgres + NATS via Docker Compose, migrate, Turbo dev)
+6. *(15-second wait for databases to become ready)*
+7. **shell** — `pnpm dev` (Next.js dev server)
+8. **gateway** — `pnpm dev` (NestJS in watch mode)
 
 Each service handles its own infrastructure. The workspace script does not manage Docker directly.
 
@@ -254,7 +283,10 @@ The following cannot be fully automated and require manual steps:
 | Service `.env` files              | `gateway/.env`, `auth-service/.env`    |
 | SSH keys / GitHub access          | Your local git configuration           |
 | RSA key pair for JWT signing      | `auth-service/.env` (see its README)   |
-| `GATEWAY_SERVICE_TOKEN` value     | Both `gateway/.env` and `diary/.env`   |
+| `GATEWAY_SERVICE_TOKEN` value     | `gateway/.env` ↔ `diary` / `settings` / `task-manager` API `.env` |
+| `TASKS_SERVICE_TOKEN` / tasks URLs | `gateway/.env` (must match task-manager-api `GATEWAY_SERVICE_TOKEN`) |
+| `llm-service/.env`                | `DATABASE_URL`, `NATS_URL`, `OLLAMA_BASE_URL`, model defaults |
+| Ollama on host                    | Run Ollama locally; pull the model named in `DEFAULT_MODEL` |
 | Docker Desktop                    | Must be running before `node run.mjs dev` |
 
 Refer to the README in each individual repository for the full setup details.
@@ -285,5 +317,8 @@ Each repository is fully independent:
 | `gateway`    | Routing, JWT validation, rate limiting, CORS      |
 | `auth-service` | User accounts, JWT issuance, JWKS, key rotation |
 | `diary`      | Diary entries, editor UI, outbox events, worker   |
+| `llm-service` | LLM gateway — job queue, Ollama client, NATS consumer |
+| `settings`   | Projects, tags, account settings MFE + API        |
+| `task-manager` | Task Manager MFE + API (bootstrap; features later) |
 
 This workspace repo does not override or duplicate anything owned by those repositories.

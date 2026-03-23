@@ -8,7 +8,7 @@ import path from 'path';
 import { commandExistsSync, repoPath } from './lib.mjs';
 import { runClone } from './clone.mjs';
 
-const REPOS = ['shell', 'gateway', 'auth-service', 'diary'];
+const REPOS = ['shell', 'gateway', 'auth-service', 'diary', 'llm-service', 'settings', 'task-manager'];
 
 export function runBootstrap() {
   console.log('╔══════════════════════════════════════════╗');
@@ -84,6 +84,8 @@ export function runBootstrap() {
   }
   checkEnv('gateway', '.env', '.env.example');
   checkEnv('auth-service', '.env', '.env.example');
+  checkEnv('llm-service', '.env', '.env.example');
+  checkEnv('task-manager', 'apps/task-manager-api/.env', 'apps/task-manager-api/.env.example');
   console.log('');
 
   console.log('╔══════════════════════════════════════════╗');
@@ -101,6 +103,11 @@ export function runBootstrap() {
   console.log('  http://localhost:4001   Auth Service');
   console.log('  http://localhost:4280   Diary Web');
   console.log('  http://localhost:4281   Diary API');
+  console.log('  http://localhost:4380   Settings Web');
+  console.log('  http://localhost:4381   Settings API');
+  console.log('  http://localhost:4480   Task Manager Web');
+  console.log('  http://localhost:4481   Task Manager API');
+  console.log('  http://localhost:4583   LLM Service (Ollama gateway API)');
   console.log('');
   console.log('For full details see:  README.md');
 }

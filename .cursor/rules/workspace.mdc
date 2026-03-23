@@ -6,7 +6,7 @@ alwaysApply: true
 
 # OmniRadon — Workspace Rules
 
-This workspace orchestrates four separate repositories. Apply these rules whenever working across multiple repositories or from this workspace root.
+This workspace orchestrates seven application repositories (plus this orchestrator). Apply these rules whenever working across multiple repositories or from this workspace root.
 
 ## Repository map
 
@@ -16,6 +16,9 @@ This workspace orchestrates four separate repositories. Apply these rules whenev
 | `gateway`      | API gateway / reverse proxy (single origin)      | 3000           |
 | `auth-service` | Authentication microservice — JWT RS256, JWKS    | 4001           |
 | `diary`        | Diary MFE + API + worker (Turborepo monorepo)    | 4280 / 4281    |
+| `llm-service`  | LLM gateway — Ollama job queue, NATS consumer    | 4583 / 54323   |
+| `settings`     | User settings MFE + API (projects, tags, future prefs) | 4380 / 4381 |
+| `task-manager` | Task Manager MFE + API (Turborepo monorepo)            | 4480 / 4481 |
 
 This workspace repo (`OmniRadon`) contains **only orchestration**: scripts, Makefile, README, and these rules. It contains no application logic.
 
@@ -31,6 +34,9 @@ Before writing any code, identify which repository owns the affected domain. A f
 
 - Auth logic (JWT issuance, refresh tokens, JWKS) → `auth-service`
 - Diary domain logic (entries, outbox events) → `diary`
+- Cross-app user settings (projects, tags, preferences, integrations) → `settings`
+- Task management domain logic → `task-manager`
+- LLM gateway (prompt queue, Ollama, generic job API) → `llm-service`
 - Routing and proxy rules → `gateway`
 - Auth UI flows (login form, register, token handoff) → `shell`
 - Orchestration scripts only → this workspace repo
@@ -50,9 +56,9 @@ Make the smallest change needed in each repository. Avoid large refactors that s
 ### 6. Preserve the service boundaries
 
 - The gateway is the **single entry point** — application code must not bypass it by calling services directly.
-- Each service owns its own database — do not share databases between `auth-service` and `diary`.
-- `diary-api` is protected by `GATEWAY_SERVICE_TOKEN`, not by user JWTs directly.
-- `shell` handles auth UI; `diary-web` handles diary content only.
+- Each service owns its own database — do not share databases between `auth-service`, `diary`, `settings`, `task-manager`, and `llm-service`.
+- `diary-api`, `settings-api`, and `task-manager-api` are protected by per-service gateway tokens (`DIARY_SERVICE_TOKEN` / `SETTINGS_SERVICE_TOKEN` / `TASKS_SERVICE_TOKEN`), not by user JWTs directly.
+- `shell` handles auth UI; `diary-web` handles diary content only; `settings-web` handles account settings MFE; `task-manager-web` handles task UI only.
 
 ### 7. Do not introduce monorepo assumptions
 
@@ -80,11 +86,17 @@ Browser
   └── Gateway :3000                          (single origin, JWT validation via JWKS)
         ├── /                → Shell :3001   (login / register / auth redirect)
         ├── /auth/*          → Auth Service :4001   (RS256 JWT, JWKS, refresh rotation)
-        ├── /app/diary       → Diary Web :4280      (Next.js MFE, BlockNote editor)
-        └── /diary/*         → Diary API :4281      (NestJS, Prisma, service token auth)
+        ├── /mfe/diary/*     → Diary Web :4280      (Next.js MFE, BlockNote editor)
+        ├── /mfe/settings/*  → Settings Web :4380   (Next.js settings MFE)
+        ├── /mfe/tasks/*     → Task Manager Web :4480 (Next.js MFE)
+        ├── /diary/*         → Diary API :4281      (NestJS, Prisma, service token auth)
+        ├── /settings/*      → Settings API :4381   (NestJS, Prisma, service token auth)
+        └── /tasks/*         → Task Manager API :4481 (NestJS, Prisma, service token auth)
 
 Background:
   Diary Worker  → NATS JetStream :42220  (outbox publisher for DIARY_EVENTS)
+  LLM Service   → subscribes to DIARY_EVENTS (durable `llm-service`) → Ollama on host :11434
+  Task Manager  → NATS JetStream :42221  (reserved for future TASK_MANAGER_EVENTS publisher)
 ```
 
 Auth flow summary: `Shell` collects credentials → `Auth Service` issues RS256 JWT → JWT passed via hash fragment to `Diary Web` → `Gateway` validates JWT via JWKS on every subsequent request.

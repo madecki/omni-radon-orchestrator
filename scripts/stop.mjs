@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Stop tracked services (PID files), run per-repo `pnpm run dev:stop` (Docker Compose down),
- * then kill any remaining listeners on stack ports.
+ * Stop tracked services (PID files), run per-repo `pnpm run dev:stop` (Docker Compose down)
+ * for auth-service, diary, llm-service, settings, task-manager, then kill listeners on stack ports.
  */
 import { execSync, spawnSync } from 'child_process';
 import fs from 'fs';
@@ -9,7 +9,25 @@ import path from 'path';
 import { getWorkspaceRoot, isWin32, repoPath } from './lib.mjs';
 
 /** Same ports as previous stop.sh */
-const STACK_PORTS = [3000, 3001, 4001, 4280, 4281, 5433, 54320, 42220];
+const STACK_PORTS = [
+  3000,
+  3001,
+  4001,
+  4280,
+  4281,
+  4380,
+  4381,
+  4480,
+  4481,
+  4583,
+  5433,
+  54320,
+  54321,
+  54322,
+  54323,
+  42220,
+  42221,
+];
 
 function sleepSync(ms) {
   const end = Date.now() + ms;
@@ -197,6 +215,9 @@ export function runStop() {
 
   runRepoDevStop('auth-service');
   runRepoDevStop('diary');
+  runRepoDevStop('llm-service');
+  runRepoDevStop('settings');
+  runRepoDevStop('task-manager');
 
   for (const port of STACK_PORTS) {
     const pids = pidsListeningOnPort(port);

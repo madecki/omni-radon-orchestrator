@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { getWorkspaceRoot } from './lib.mjs';
 
-const SERVICES = ['auth-service', 'diary', 'gateway', 'shell'];
+const SERVICES = ['auth-service', 'diary', 'llm-service', 'settings', 'task-manager', 'gateway', 'shell'];
 
 function tailLastLines(filepath, maxLines) {
   if (!fs.existsSync(filepath)) return '';
