@@ -17,6 +17,39 @@ export function getWorkspaceRoot() {
   return path.resolve(getScriptsDir(), '..');
 }
 
+/**
+ * Load `<workspaceRoot>/.env` into `process.env`.
+ * Does not override variables already set in the environment (shell / OS wins).
+ * Minimal KEY=value parsing: # comments, optional single/double quotes on values.
+ * @returns {boolean} true if `.env` existed (was read, even if every key was skipped)
+ */
+export function loadWorkspaceDotEnv(workspaceRoot) {
+  const envPath = path.join(workspaceRoot, '.env');
+  if (!fs.existsSync(envPath)) {
+    return false;
+  }
+  const text = fs.readFileSync(envPath, 'utf8');
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+    let value = trimmed.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+  return true;
+}
+
 export function getReposConfPath() {
   return path.join(getWorkspaceRoot(), 'repos.conf');
 }

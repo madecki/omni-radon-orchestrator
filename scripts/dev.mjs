@@ -6,13 +6,19 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getWorkspaceRoot } from './lib.mjs';
+import { getWorkspaceRoot, loadWorkspaceDotEnv } from './lib.mjs';
 import { runStop } from './stop.mjs';
 
 const SCRIPTS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const SERVICE_RUNNER = path.join(SCRIPTS_DIR, 'service-runner.mjs');
 
 const INFRA_WAIT_MS = 15_000;
+const NEXT_LOCK_FILES = [
+  ['shell', '.next', 'dev', 'lock'],
+  ['diary', 'apps', 'diary-web', '.next', 'dev', 'lock'],
+  ['settings', 'apps', 'settings-web', '.next', 'dev', 'lock'],
+  ['task-manager', 'apps', 'task-manager-web', '.next', 'dev', 'lock'],
+];
 
 function startService(workspaceRoot, name, relDir, command) {
   const dir = path.join(workspaceRoot, relDir);
@@ -85,8 +91,44 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function warnOnUnexpectedRootLockfiles(workspaceRoot) {
+  const unexpected = ['package-lock.json', 'yarn.lock', 'bun.lockb']
+    .map((name) => path.join(workspaceRoot, name))
+    .filter((p) => fs.existsSync(p));
+
+  if (unexpected.length === 0) return;
+
+  console.log('');
+  console.log('  WARN  Unexpected root lockfile(s) detected in workspace repo:');
+  for (const lockfile of unexpected) {
+    console.log(`        - ${path.basename(lockfile)}`);
+  }
+  console.log('        These can cause Next/Turbopack to select the wrong workspace root.');
+  console.log('');
+}
+
+function clearNextDevLocks(workspaceRoot) {
+  let removed = 0;
+  for (const relParts of NEXT_LOCK_FILES) {
+    const lockPath = path.join(workspaceRoot, ...relParts);
+    if (!fs.existsSync(lockPath)) continue;
+    try {
+      fs.unlinkSync(lockPath);
+      removed += 1;
+    } catch (err) {
+      console.log(`  WARN  Could not remove stale lock: ${lockPath} (${err.message})`);
+    }
+  }
+
+  if (removed > 0) {
+    console.log(`  CLEAN Removed ${removed} stale Next.js dev lock file(s).`);
+  }
+}
+
 export async function runDev() {
   const workspaceRoot = getWorkspaceRoot();
+  const hadWorkspaceEnv = loadWorkspaceDotEnv(workspaceRoot);
+  warnOnUnexpectedRootLockfiles(workspaceRoot);
 
   let shuttingDown = false;
   const shutdown = () => {
@@ -106,7 +148,16 @@ export async function runDev() {
   console.log('║   OmniRadon — starting dev stack         ║');
   console.log('╚══════════════════════════════════════════╝');
   console.log('');
+  if (hadWorkspaceEnv) {
+    console.log('  ENV   Loaded workspace .env (only keys not already set in your environment)');
+    console.log('');
+  }
   console.log('Docker must be running before proceeding.');
+  console.log('');
+
+  console.log('  CLEAN Stopping any previously running stack processes...');
+  runStop();
+  clearNextDevLocks(workspaceRoot);
   console.log('');
 
   startService(workspaceRoot, 'auth-service', 'auth-service', 'pnpm dev');

@@ -18,10 +18,17 @@
 import { spawn } from 'child_process';
 
 const command = process.argv.slice(2).join(' ');
+const env = { ...process.env };
+
+// Next/Turbopack on Windows can mis-handle a semicolon-delimited NODE_PATH
+// (treating the full value as a single modules directory), which then breaks
+// module resolution for packages like "tailwindcss".
+delete env.NODE_PATH;
 
 const child = spawn(command, {
   stdio: ['ignore', 'pipe', 'pipe'],
   shell: true,
+  env,
   windowsHide: true,
 });
 

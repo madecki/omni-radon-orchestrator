@@ -4,6 +4,7 @@ shell/
 gateway/
 auth-service/
 diary/
+llm-service/
 settings/
 task-manager/
 
@@ -13,6 +14,7 @@ logs/
 
 # ── Local environment ─────────────────────────────────────────────────────────
 .env
+package-lock.json
 
 # ── OS / editor ───────────────────────────────────────────────────────────────
 .DS_Store

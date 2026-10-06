@@ -124,7 +124,12 @@ cp auth-service/.env.example auth-service/.env
 # fill in auth-service/.env
 ```
 
-Configure `task-manager/apps/task-manager-api/.env` (copy from `.env.example`); set `GATEWAY_SERVICE_TOKEN` to the same value as `TASKS_SERVICE_TOKEN` in `gateway/.env`.
+Configure `task-manager/apps/task-manager-api/.env` (copy from `.env.example`):
+
+- **`GATEWAY_SERVICE_TOKEN`** — same as `TASKS_SERVICE_TOKEN` in `gateway/.env` (task-manager accepts proxied browser traffic).
+- **`SETTINGS_SERVICE_TOKEN`** — same as **`SETTINGS_SERVICE_TOKEN`** in `gateway/.env` and **`GATEWAY_SERVICE_TOKEN`** in `settings/apps/settings-api/.env` (server-to-server calls to Settings API). If these three differ, task-manager logs `Settings GET /projects failed: 401 Invalid service token`.
+
+Copy `settings/apps/settings-api/.env.example` → `.env` and set `GATEWAY_SERVICE_TOKEN` to that shared settings secret (min 32 chars).
 
 Copy `llm-service/.env.example` → `llm-service/.env` (`DATABASE_URL`, `NATS_URL`, `OLLAMA_BASE_URL`). **Ollama** must be running on the host (default `http://localhost:11434`) with your chosen model pulled.
 
@@ -135,6 +140,26 @@ Shell, diary-web, and settings-web do not require their own `.env` files for loc
 ```bash
 node run.mjs dev
 ```
+
+### Access from other devices on your LAN
+
+Next.js dev apps use an `assetPrefix` that must match the host clients use to load JS/CSS. By default that host is `localhost`, which breaks CSS when you open the gateway from another machine (e.g. `http://192.168.1.5:3000`).
+
+1. **Set the dev host** in a **workspace-root `.env`** file (same directory as `run.mjs`, already gitignored). `node run.mjs dev` loads it before starting services, so it works the same from any shell or IDE task:
+
+   ```env
+   NEXT_PUBLIC_DEV_HOST=192.168.1.5
+   ```
+
+   Use your machine’s LAN IP or a hostname (no `http://`). Shell, diary-web, settings-web, and task-manager-web use it for dev `assetPrefix` and for `allowedDevOrigins` (including `http://<host>:3000` as the gateway origin). See [`.env.example`](.env.example). If you run the gateway on another port or HTTPS in dev, you may need a follow-up change to those `next.config.ts` files.
+
+   If a variable is **already set** in your environment (e.g. you exported it in the terminal), that value wins and the line in `.env` is skipped for that key.
+
+2. **Firewall**: allow inbound TCP on ports **3000** (gateway), **3001**, **4280**, **4380**, **4480** (Next dev servers for assets / HMR), or temporarily disable the firewall for local testing.
+
+3. On the other device, open **`http://<your-ip>:3000`** (gateway entry point).
+
+If you run **`pnpm dev` inside a single repo** (not via `node run.mjs dev`), put `NEXT_PUBLIC_DEV_HOST=…` in that app’s `.env.local` instead, or export it in the shell for that session.
 
 ---
 
